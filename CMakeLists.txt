@@ -29,4 +29,4 @@ add_executable(powmon p1parse.cc  )
 target_link_libraries(powmon support)
 
 add_executable(solcount solcount.cc  )
-target_link_libraries(solcount support -lgpiodcxx)
+target_link_libraries(solcount support -lgpiodcxx -latomic)
