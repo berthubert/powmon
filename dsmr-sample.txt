@@ -1,0 +1,78 @@
+/KFM5KAIFA-METER
+
+Version:
+1-3:0.2.8(42)
+
+Date stamp:
+0-0:1.0.0(210411201513S)
+
+Equipment ID:
+0-0:96.1.1(4530303236333030303330333138313136)
+
+Tariff 1 delivered
+1-0:1.8.1(011295.029*kWh)
+Tariff 2 delivered
+1-0:1.8.2(011173.196*kWh)
+
+Tariff 1 out
+1-0:2.8.1(001286.748*kWh)
+Tariff 2 out
+1-0:2.8.2(003042.395*kWh)
+
+Tariff indicator:
+0-0:96.14.0(0001)
+
+Power in:
+1-0:1.7.0(02.677*kW)
+
+Power out:
+1-0:2.7.0(00.000*kW)
+
+Power failures in any phase
+0-0:96.7.21(00000)
+Long power failures in any phase:
+0-0:96.7.9(00000)
+
+Power failure event log:
+1-0:99.97.0(1)(0-0:96.7.19)(000101000018W)(2147483647*s)
+
+L1 sags:
+1-0:32.32.0(00000)
+L2 sags:
+1-0:52.32.0(00000)
+L3 sags:
+1-0:72.32.0(00001)
+
+L1 swells:
+1-0:32.36.0(00000)
+L2 swells:
+1-0:52.36.0(00000)
+L3 swells:
+1-0:72.36.0(00000)
+
+Text message:
+0-0:96.13.1()
+Text message:
+0-0:96.13.0()
+
+L1 amps:
+1-0:31.7.0(002*A)
+L2 amps:
+1-0:51.7.0(000*A)
+L3 amps:
+1-0:71.7.0(009*A)
+
+L1 power:
+1-0:21.7.0(00.469*kW)
+L2 power:
+1-0:41.7.0(00.000*kW)
+L3 power:
+1-0:61.7.0(02.217*kW)
+
+L1 power OUT:
+1-0:22.7.0(00.000*kW)
+L2 power OUT:
+1-0:42.7.0(00.009*kW)
+L3 power OUT:
+1-0:62.7.0(00.000*kW)
+!1EE8
