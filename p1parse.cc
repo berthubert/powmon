@@ -15,6 +15,7 @@
 #include <sstream>
 #include <thread>
 #include "ext/powerblog/h2o-pp.hh"
+#include <mutex>
 
 int g_baudval{B115200};
 
@@ -89,15 +90,23 @@ map<string, double> parseDSMR(const std::string& in)
   return ret;
 }
 
+std::mutex g_metrix_mutex;  
 std::shared_ptr<map<string, double>> g_metrics;
 
 static void addMetric(ostringstream& ret, std::string_view key, std::string_view desc, std::string_view kind, double factor=1.0)
 {
-  auto metrics = g_metrics;
+
+  map<string, double> metrics;
+  {
+    std::lock_guard<std::mutex> lock(g_metrix_mutex);
+    metrics = *g_metrics;
+  }
+    
+
   string rkey = string_replace((string)key, ".", "_");
   ret << "# HELP dsmr_" << rkey << " " <<desc <<endl;
   ret << "# TYPE dsmr_"<< rkey << " " << kind <<endl;
-  ret<<"dsmr_"<<rkey<<" "<< std::fixed<< factor*(*metrics)[(string)key] <<endl;
+  ret<<"dsmr_"<<rkey<<" "<< std::fixed<< factor*metrics[(string)key] <<endl;
 }
 
 int main()
@@ -163,7 +172,10 @@ int main()
       cerr<< r.first <<" = " <<r.second<<endl;
       (*metrics)[r.first] = r.second;
     }
-    g_metrics = metrics;
+    {
+      std::lock_guard<std::mutex> lock(g_metrix_mutex);
+      g_metrics = metrics;
+    }
     if(first) {
       std::thread ws([&h2s]() {
 		       auto actx = h2s.addContext();
