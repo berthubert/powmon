@@ -69,8 +69,8 @@ map<string, double> parseDSMR(const std::string& in)
   map<string, double> ret;
   
   while(getline(inp, line)) {
-    if(line.find("kW")== string::npos)
-      continue;
+    //    if(line.find("kW")== string::npos)
+    //  continue;
 
     /*
     1-0:1.8.1(011295.029*kWh)
@@ -140,6 +140,16 @@ int main()
 			       addMetric(ret, "96.14.0", "Tariff indicator", "gauge");
 			       addMetric(ret, "96.7.21", "Power failires in any phase", "counter");
 			       addMetric(ret, "96.7.9", "Long power failires in any phase", "counter");
+
+			       addMetric(ret, "32.32.0", "L1 sags", "counter");
+			       addMetric(ret, "52.32.0", "L2 sags", "counter");
+			       addMetric(ret, "72.32.0", "L3 sags", "counter");
+
+			       addMetric(ret, "32.36.0", "L1 swells", "counter");
+			       addMetric(ret, "52.36.0", "L2 swells", "counter");
+			       addMetric(ret, "72.36.0", "L3 swells", "counter");
+
+			       
 			       return pair<string,string>("text/plain", ret.str());
 			     });
       
