@@ -25,7 +25,7 @@ add_library(support STATIC ext/powerblog/h2o-pp.cc
 target_include_directories(support PUBLIC ext/powerblog/ext/simplesocket ext/powerblog/ext ext/fmt-7.1.3/include/)
 target_link_libraries(support PUBLIC -lh2o-evloop -lssl -lcrypto Threads::Threads)
 
-add_executable(powmon p1parse.cc minicurl.cc )
+add_executable(powmon p1parse.cc minicurl.cc money.cc)
 target_link_libraries(powmon support -lcurl)
 
 add_executable(solcount solcount.cc  )

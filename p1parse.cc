@@ -16,9 +16,11 @@
 #include <thread>
 #include "ext/powerblog/h2o-pp.hh"
 #include <mutex>
+#include "powmon.hh"
 
 int g_baudval{B115200};
 
+// basic search and replace
 std::string string_replace(const std::string& str, const std::string& match, 
         const std::string& replacement)
 {
@@ -36,6 +38,7 @@ std::string string_replace(const std::string& str, const std::string& match,
 
 
 
+// set the termios correctly
 static void doTermios(int fd)
 {
   struct termios newtio;
@@ -56,12 +59,11 @@ static void doTermios(int fd)
     perror("tcsetattr");
     exit(-1);
   }
-
 }
 
 using namespace std;
 
-
+// parse a DSMR message (badly)
 map<string, double> parseDSMR(const std::string& in)
 {
   istringstream inp(in);
@@ -84,8 +86,6 @@ map<string, double> parseDSMR(const std::string& in)
 	if(auto pos3 = line.find(')', pos2); pos3 != string::npos) {
 	  ret[line.substr(pos1+1, pos2-pos1-1)]=atof(&line[pos2+1]);
 	}
-    
-    
   }
   return ret;
 }
@@ -93,16 +93,8 @@ map<string, double> parseDSMR(const std::string& in)
 std::mutex g_metrix_mutex;  
 std::shared_ptr<map<string, double>> g_metrics;
 
-static void addMetric(ostringstream& ret, std::string_view key, std::string_view desc, std::string_view kind, double factor=1.0)
-{
-
-  map<string, double> metrics;
-  {
-    std::lock_guard<std::mutex> lock(g_metrix_mutex);
-    metrics = *g_metrics;
-  }
-    
-
+static void addMetric(map<string, double>& metrics, ostringstream& ret, std::string_view key, std::string_view desc, std::string_view kind, double factor=1.0)
+{    
   string rkey = string_replace((string)key, ".", "_");
   ret << "# HELP dsmr_" << rkey << " " <<desc <<endl;
   ret << "# TYPE dsmr_"<< rkey << " " << kind <<endl;
@@ -111,6 +103,9 @@ static void addMetric(ostringstream& ret, std::string_view key, std::string_view
 
 int main()
 {
+  std::thread t(pricingThread);
+  t.detach();
+  
   int fd = open("/dev/ttyUSB0", O_RDONLY);
   if(fd < 0)
     throw runtime_error("Unable to open serial port: "+string(strerror(errno)));
@@ -121,42 +116,47 @@ int main()
   h2s.addHandler("/metrics", [](auto handler, auto req) {
 			       ostringstream ret;
 
-			       addMetric(ret, "1.8.1", "Total energy IN low tariff (J)", "counter", 3600*1000);
-			       addMetric(ret, "1.8.2", "Total energy IN high tariff (J)", "counter", 3600*1000);
-			       addMetric(ret, "2.8.1", "Total energy OUT low tariff (J)", "counter", 3600*1000);
-			       addMetric(ret, "2.8.2", "Total energy OUT high tariff (J)", "counter", 3600*1000);
+                               map<string, double> metrics;
+                               {
+                                 std::lock_guard<std::mutex> lock(g_metrix_mutex);
+                                 metrics = *g_metrics;
+                               }
 
-			       addMetric(ret, "1.7.0", "Total power IN (kW)", "gauge");
-			       addMetric(ret, "2.7.0", "Total power OUT (kW)", "gauge");
+			       addMetric(metrics, ret, "1.8.1", "Total energy IN low tariff (J)", "counter", 3600*1000);
+			       addMetric(metrics, ret, "1.8.2", "Total energy IN high tariff (J)", "counter", 3600*1000);
+			       addMetric(metrics, ret, "2.8.1", "Total energy OUT low tariff (J)", "counter", 3600*1000);
+			       addMetric(metrics, ret, "2.8.2", "Total energy OUT high tariff (J)", "counter", 3600*1000);
 
-			       addMetric(ret, "21.7.0", "Total power IN (kW) phase 1", "gauge");
-			       addMetric(ret, "41.7.0", "Total power IN (kW) phase 2", "gauge");
-			       addMetric(ret, "61.7.0", "Total power IN (kW) phase 3", "gauge");
+			       addMetric(metrics, ret, "1.7.0", "Total power IN (kW)", "gauge");
+			       addMetric(metrics, ret, "2.7.0", "Total power OUT (kW)", "gauge");
 
-			       addMetric(ret, "22.7.0", "Total power OUT (kW) phase 1", "gauge");
-			       addMetric(ret, "42.7.0", "Total power OUT (kW) phase 2", "gauge");
-			       addMetric(ret, "62.7.0", "Total power OUT (kW) phase 3", "gauge");
+			       addMetric(metrics, ret, "21.7.0", "Total power IN (kW) phase 1", "gauge");
+			       addMetric(metrics, ret, "41.7.0", "Total power IN (kW) phase 2", "gauge");
+			       addMetric(metrics, ret, "61.7.0", "Total power IN (kW) phase 3", "gauge");
 
-			       addMetric(ret, "96.14.0", "Tariff indicator", "gauge");
-			       addMetric(ret, "96.7.21", "Power failires in any phase", "counter");
-			       addMetric(ret, "96.7.9", "Long power failires in any phase", "counter");
+			       addMetric(metrics, ret, "22.7.0", "Total power OUT (kW) phase 1", "gauge");
+			       addMetric(metrics, ret, "42.7.0", "Total power OUT (kW) phase 2", "gauge");
+			       addMetric(metrics, ret, "62.7.0", "Total power OUT (kW) phase 3", "gauge");
 
-			       addMetric(ret, "32.32.0", "L1 sags", "counter");
-			       addMetric(ret, "52.32.0", "L2 sags", "counter");
-			       addMetric(ret, "72.32.0", "L3 sags", "counter");
+			       addMetric(metrics, ret, "96.14.0", "Tariff indicator", "gauge");
+			       addMetric(metrics, ret, "96.7.21", "Power failires in any phase", "counter");
+			       addMetric(metrics, ret, "96.7.9", "Long power failires in any phase", "counter");
 
-			       addMetric(ret, "32.36.0", "L1 swells", "counter");
-			       addMetric(ret, "52.36.0", "L2 swells", "counter");
-			       addMetric(ret, "72.36.0", "L3 swells", "counter");
+			       addMetric(metrics, ret, "32.32.0", "L1 sags", "counter");
+			       addMetric(metrics, ret, "52.32.0", "L2 sags", "counter");
+			       addMetric(metrics, ret, "72.32.0", "L3 sags", "counter");
+
+			       addMetric(metrics, ret, "32.36.0", "L1 swells", "counter");
+			       addMetric(metrics, ret, "52.36.0", "L2 swells", "counter");
+			       addMetric(metrics, ret, "72.36.0", "L3 swells", "counter");
 
 			       
 			       return pair<string,string>("text/plain", ret.str());
 			     });
       
-
-  
   bool first = true;
-  
+
+  // we passively read DSMR messages
   for(;;) {
     string msg;
     char c;
@@ -182,8 +182,17 @@ int main()
       cerr<< r.first <<" = " <<r.second<<endl;
       (*metrics)[r.first] = r.second;
     }
+    // update the metrics store
     {
       std::lock_guard<std::mutex> lock(g_metrix_mutex);
+      double jouleDiff = ((*metrics)["1.8.1"] + (*metrics)["1.8.2"] - (*metrics)["2.8.1"] - (*metrics)["2.8.2"]) -
+        ((*g_metrics)["1.8.1"] + (*g_metrics)["1.8.2"] - (*g_metrics)["2.8.1"] - (*g_metrics)["2.8.2"]);
+      auto price = getPrice(time(0));
+      if(price) {
+        (*metrics)["euros"] = (*g_metrics)["euros"];
+        (*metrics)["euros"] += *price*jouleDiff/3600000.0;
+      }
+      
       g_metrics = metrics;
     }
     if(first) {

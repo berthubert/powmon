@@ -1,7 +1,7 @@
 Two tools to measure power usage using external meters, and publish this in
 Prometheus format.
 
-Both tools require libh2o-evloop. Compiling requires cmake.
+Both tools require libh2o-evloop. Compiling requires cmake. 
 
 Clone this repo like this: `git clone --recursive
 https://github.com/berthubert/powmon.git` 
@@ -19,6 +19,8 @@ make
 
 powmon
 ------
+Requires libcurl-dev
+
 Initializes /dev/ttyUSB0 to 115200 and expects to find DSMR coded data
 there. Published on 0.0.0.0:10000/metrics/
 
