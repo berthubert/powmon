@@ -94,7 +94,9 @@ std::mutex g_metrix_mutex;
 std::shared_ptr<map<string, double>> g_metrics;
 
 static void addMetric(map<string, double>& metrics, ostringstream& ret, std::string_view key, std::string_view desc, std::string_view kind, double factor=1.0)
-{    
+{
+  if(!metrics.count((string)key))
+    return;
   string rkey = string_replace((string)key, ".", "_");
   ret << "# HELP dsmr_" << rkey << " " <<desc <<endl;
   ret << "# TYPE dsmr_"<< rkey << " " << kind <<endl;
@@ -149,6 +151,8 @@ int main()
 			       addMetric(metrics, ret, "32.36.0", "L1 swells", "counter");
 			       addMetric(metrics, ret, "52.36.0", "L2 swells", "counter");
 			       addMetric(metrics, ret, "72.36.0", "L3 swells", "counter");
+			       addMetric(metrics, ret, "euros", "euros all-in", "counter", 1000);
+			       addMetric(metrics, ret, "price", "all-in price", "gauge", 100);			       
 
 			       
 			       return pair<string,string>("text/plain", ret.str());
@@ -175,24 +179,55 @@ int main()
 	break;
       msg.append(1, c);
     }
-    //    cerr<<"Got a DSMR message: "<<msg<<endl;
     auto res=parseDSMR(msg);
     auto metrics = make_shared<map<string,double>>();
     for(const auto& r: res) {
-      cerr<< r.first <<" = " <<r.second<<endl;
+      //cerr<< r.first <<" = " <<r.second<<endl;
       (*metrics)[r.first] = r.second;
     }
     // update the metrics store
     {
       std::lock_guard<std::mutex> lock(g_metrix_mutex);
-      double jouleDiff = ((*metrics)["1.8.1"] + (*metrics)["1.8.2"] - (*metrics)["2.8.1"] - (*metrics)["2.8.2"]) -
-        ((*g_metrics)["1.8.1"] + (*g_metrics)["1.8.2"] - (*g_metrics)["2.8.1"] - (*g_metrics)["2.8.2"]);
-      auto price = getPrice(time(0));
+      static double prevKwh;
+      static double euros;
+      static std::optional<double> rprice;
+      static time_t lastEurosTime;
+      time_t now = time(0);
+      double kwh = ((*metrics)["1.8.1"] + (*metrics)["1.8.2"] - (*metrics)["2.8.1"] - (*metrics)["2.8.2"]);
+      cout<<lastEurosTime/900<<" euros "<<euros<<" kWh "<< kwh <<" prevKwh "<< prevKwh;
+
+      auto price = getPrice(now);
       if(price) {
-        (*metrics)["euros"] = (*g_metrics)["euros"];
-        (*metrics)["euros"] += *price*jouleDiff/3600000.0;
+	double nowprice = 1.09*((*price)+0.09);
+	(*metrics)["price"]=nowprice;
+	cout<<" price "<< nowprice;
       }
+      else
+	rprice.reset();
+      cout<<endl;
       
+      if(!lastEurosTime || now/900 != lastEurosTime/900) {
+
+	if(!lastEurosTime) {
+	  prevKwh=kwh;
+	}
+	else {
+	  double kwhDiff = kwh - prevKwh;
+	  cout<<"kwhDiff: "<< kwhDiff <<endl;
+	  price = getPrice(now-120); // to make sure we catch the price of the whole interval
+	  if(price) {
+	    rprice = 1.09*((*price)+0.09);
+	    double delta = (*rprice)*kwhDiff;
+	    euros += delta;
+	    time_t t = now-120;
+	    cout<<"euro deposit: "<<delta<<", new total: "<< euros <<", price "<< (*rprice) << " @ " << ctime(&t);
+	  }
+	  prevKwh = kwh;
+	}
+	lastEurosTime = time(0);
+      }
+      (*metrics)["euros"]=euros;
+	    
       g_metrics = metrics;
     }
     if(first) {
