@@ -17,6 +17,7 @@
 #include "ext/powerblog/h2o-pp.hh"
 #include <mutex>
 #include "powmon.hh"
+#include "sqlwriter.hh"
 
 int g_baudval{B115200};
 
@@ -160,6 +161,8 @@ int main()
       
   bool first = true;
 
+  SQLiteWriter sqw("electricity.sqlite3");
+  
   // we passively read DSMR messages
   for(;;) {
     string msg;
@@ -227,9 +230,16 @@ int main()
 	lastEurosTime = time(0);
       }
       (*metrics)["euros"]=euros;
-	    
+
+      vector<pair<const char*, SQLiteWriter::var_t>> values;
+      for(const auto& v : *metrics)
+	values.emplace_back(v.first.c_str(), v.second);
+      values.emplace_back("timestamp", time(0));
+      sqw.addValue(values);
+      
       g_metrics = metrics;
     }
+
     if(first) {
       std::thread ws([&h2s]() {
 		       auto actx = h2s.addContext();
