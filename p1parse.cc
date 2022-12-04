@@ -143,7 +143,7 @@ int main()
 
 			       addMetric(metrics, ret, "96.14.0", "Tariff indicator", "gauge");
 			       addMetric(metrics, ret, "96.7.21", "Power failires in any phase", "counter");
-			       addMetric(metrics, ret, "96.7.9", "Long power failires in any phase", "counter");
+			       addMetric(metrics, ret, "96.7.9", "Long power failures in any phase", "counter");
 
 			       addMetric(metrics, ret, "32.32.0", "L1 sags", "counter");
 			       addMetric(metrics, ret, "52.32.0", "L2 sags", "counter");
@@ -155,7 +155,6 @@ int main()
 			       addMetric(metrics, ret, "euros", "euros all-in", "counter", 1000);
 			       addMetric(metrics, ret, "price", "all-in price", "gauge", 100);			       
 
-			       
 			       return pair<string,string>("text/plain", ret.str());
 			     });
       
