@@ -200,7 +200,7 @@ int main()
 
       auto price = getPrice(now);
       if(price) {
-	double nowprice = 1.09*((*price)+0.09);
+	double nowprice = 1.21*((*price)+0.14718);
 	(*metrics)["price"]=nowprice;
 	cout<<" price "<< nowprice;
       }
@@ -218,7 +218,7 @@ int main()
 	  cout<<"kwhDiff: "<< kwhDiff <<endl;
 	  price = getPrice(now-120); // to make sure we catch the price of the whole interval
 	  if(price) {
-	    rprice = 1.09*((*price)+0.09);
+	    rprice = 1.21*((*price)+0.14718);
 	    double delta = (*rprice)*kwhDiff;
 	    euros += delta;
 	    time_t t = now-120;
