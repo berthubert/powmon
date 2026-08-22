@@ -1,4 +1,3 @@
-#include "minicurl.hh"
 #include <map>
 #include <mutex>
 #include <iostream>
@@ -7,10 +6,13 @@
 #include "nlohmann/json.hpp"
 #include "fmt/format.h"
 #include "fmt/printf.h"
+#include "fmt/chrono.h"
+#include "httplib.h"
 #include "powmon.hh"
 using namespace std;
 
-std::mutex g_prices_mutex;  
+std::mutex g_prices_mutex;
+// euros per kWh
 std::map<time_t, double> g_prices;
 
 void pricingThread()
@@ -23,31 +25,33 @@ void pricingThread()
       struct tm fromtm={}, tilltm={};
       gmtime_r(&from, &fromtm);
       gmtime_r(&till, &tilltm);
+
       
-      std::string url=fmt::sprintf("https://api.energyzero.nl/v1/energyprices?fromDate=%04d-%02d-%02dT22%%3A00%%3A00.000Z&tillDate=%04d-%02d-%02dT21%%3A59%%3A59.999Z&interval=4&usageType=1&inclBtw=false",
-                                   fromtm.tm_year+1900, 1+fromtm.tm_mon, fromtm.tm_mday,
-                                   tilltm.tm_year+1900, 1+tilltm.tm_mon, tilltm.tm_mday);
+      std::string url="https://berthub.eu/nlelec/nlprices.json";
       cout<<url<<endl;
 
-      MiniCurl mc;
-      string res=mc.getURL(url);
-      //cout<<res<<endl;
+      httplib::Client cli("https://berthub.eu");
+      
+      auto cres = cli.Get("/nlelec/nlprices.json");
+      if(!cres || cres->status != 200) {
+	throw runtime_error("Problem retrieving pricing from berthub");
+      }
+      string res=cres->body;
+
       using namespace nlohmann;
       json ex1 = json::parse(res);
-      auto prices=ex1["Prices"];
+      auto prices=ex1["price"];
       std::map<time_t, double> pricemap;
-      for(const auto& p : prices) {
+
+      // {"1786796100000":4.82,"1786797000000":5.23,"1786797900000":7.96 ..
+      
+      for(const auto& p : prices.items()) {
         struct tm tm;
-        // 2022-10-10T22:00:00Z
-        char* ptr=strptime(p["readingDate"].get<string>().c_str(), "%Y-%m-%dT%H:%M:%S%z", & tm);
-        if(!ptr || *ptr) {
-          throw std::runtime_error("Could not parse the whole date: "+p["readingDate"].get<string>());
-        }
-        time_t t = timegm(&tm);
-        struct tm localtm={};
-        localtime_r(&t, &localtm);
-        pricemap[t] = p["price"].get<double>();
-        cout<<p["price"].get<double>()<<", "<<p["readingDate"]<<" "<<fmt::sprintf("%04d-%02d-%02d %02d:%02d", 1900+localtm.tm_year, 1+localtm.tm_mon, localtm.tm_mday, localtm.tm_hour, localtm.tm_min)<<endl;
+	
+        time_t t = (atol(p.key().c_str()))/1000;
+        pricemap[t] = (double)p.value() / 1000.0;
+	// price is euros/mWh, we need per kWh
+	fmt::print("Date: {:%a, %d %b %Y %H:%M:%S %z (%Z)} -> {} euro/kWh", fmt::localtime(t), ((double)p.value())/1000.0);
       }
       {
         std::lock_guard<std::mutex> lock(g_prices_mutex);

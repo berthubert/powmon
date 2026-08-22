@@ -14,10 +14,13 @@
 #include <map>
 #include <sstream>
 #include <thread>
-#include "ext/powerblog/h2o-pp.hh"
 #include <mutex>
 #include "powmon.hh"
 #include "sqlwriter.hh"
+#define CPPHTTPLIB_USE_POLL
+#define CPPHTTPLIB_THREAD_POOL_COUNT 32
+
+#include "httplib.h"
 
 int g_baudval{B115200};
 
@@ -109,55 +112,54 @@ int main()
   std::thread t(pricingThread);
   t.detach();
   
-  int fd = open("/dev/ttyUSB0", O_RDONLY);
+  int fd = open("/dev/ttyUSB1", O_RDONLY);
   if(fd < 0)
     throw runtime_error("Unable to open serial port: "+string(strerror(errno)));
   doTermios(fd);
 
-  H2OWebserver h2s("p1mon");
+  httplib::Server svr;
+  svr.Get(R"(/metrics)", [](const auto &req, auto&res) {
+    ostringstream ret;
+    
+    map<string, double> metrics;
+    {
+      std::lock_guard<std::mutex> lock(g_metrix_mutex);
+      metrics = *g_metrics;
+    }
+    
+    addMetric(metrics, ret, "1.8.1", "Total energy IN low tariff (J)", "counter", 3600*1000);
+    addMetric(metrics, ret, "1.8.2", "Total energy IN high tariff (J)", "counter", 3600*1000);
+    addMetric(metrics, ret, "2.8.1", "Total energy OUT low tariff (J)", "counter", 3600*1000);
+    addMetric(metrics, ret, "2.8.2", "Total energy OUT high tariff (J)", "counter", 3600*1000);
+    
+    addMetric(metrics, ret, "1.7.0", "Total power IN (kW)", "gauge");
+    addMetric(metrics, ret, "2.7.0", "Total power OUT (kW)", "gauge");
+    
+    addMetric(metrics, ret, "21.7.0", "Total power IN (kW) phase 1", "gauge");
+    addMetric(metrics, ret, "41.7.0", "Total power IN (kW) phase 2", "gauge");
+    addMetric(metrics, ret, "61.7.0", "Total power IN (kW) phase 3", "gauge");
+    
+    addMetric(metrics, ret, "22.7.0", "Total power OUT (kW) phase 1", "gauge");
+    addMetric(metrics, ret, "42.7.0", "Total power OUT (kW) phase 2", "gauge");
+    addMetric(metrics, ret, "62.7.0", "Total power OUT (kW) phase 3", "gauge");
+    
+    addMetric(metrics, ret, "96.14.0", "Tariff indicator", "gauge");
+    addMetric(metrics, ret, "96.7.21", "Power failires in any phase", "counter");
+    addMetric(metrics, ret, "96.7.9", "Long power failures in any phase", "counter");
+    
+    addMetric(metrics, ret, "32.32.0", "L1 sags", "counter");
+    addMetric(metrics, ret, "52.32.0", "L2 sags", "counter");
+    addMetric(metrics, ret, "72.32.0", "L3 sags", "counter");
+    
+    addMetric(metrics, ret, "32.36.0", "L1 swells", "counter");
+    addMetric(metrics, ret, "52.36.0", "L2 swells", "counter");
+    addMetric(metrics, ret, "72.36.0", "L3 swells", "counter");
+    addMetric(metrics, ret, "euros", "euros all-in", "counter", 1000);
+    addMetric(metrics, ret, "price", "all-in price", "gauge", 100);			       
+    
+    res.set_content(ret.str(), "text/plain");
+  });
   
-  h2s.addHandler("/metrics", [](auto handler, auto req) {
-			       ostringstream ret;
-
-                               map<string, double> metrics;
-                               {
-                                 std::lock_guard<std::mutex> lock(g_metrix_mutex);
-                                 metrics = *g_metrics;
-                               }
-
-			       addMetric(metrics, ret, "1.8.1", "Total energy IN low tariff (J)", "counter", 3600*1000);
-			       addMetric(metrics, ret, "1.8.2", "Total energy IN high tariff (J)", "counter", 3600*1000);
-			       addMetric(metrics, ret, "2.8.1", "Total energy OUT low tariff (J)", "counter", 3600*1000);
-			       addMetric(metrics, ret, "2.8.2", "Total energy OUT high tariff (J)", "counter", 3600*1000);
-
-			       addMetric(metrics, ret, "1.7.0", "Total power IN (kW)", "gauge");
-			       addMetric(metrics, ret, "2.7.0", "Total power OUT (kW)", "gauge");
-
-			       addMetric(metrics, ret, "21.7.0", "Total power IN (kW) phase 1", "gauge");
-			       addMetric(metrics, ret, "41.7.0", "Total power IN (kW) phase 2", "gauge");
-			       addMetric(metrics, ret, "61.7.0", "Total power IN (kW) phase 3", "gauge");
-
-			       addMetric(metrics, ret, "22.7.0", "Total power OUT (kW) phase 1", "gauge");
-			       addMetric(metrics, ret, "42.7.0", "Total power OUT (kW) phase 2", "gauge");
-			       addMetric(metrics, ret, "62.7.0", "Total power OUT (kW) phase 3", "gauge");
-
-			       addMetric(metrics, ret, "96.14.0", "Tariff indicator", "gauge");
-			       addMetric(metrics, ret, "96.7.21", "Power failires in any phase", "counter");
-			       addMetric(metrics, ret, "96.7.9", "Long power failures in any phase", "counter");
-
-			       addMetric(metrics, ret, "32.32.0", "L1 sags", "counter");
-			       addMetric(metrics, ret, "52.32.0", "L2 sags", "counter");
-			       addMetric(metrics, ret, "72.32.0", "L3 sags", "counter");
-
-			       addMetric(metrics, ret, "32.36.0", "L1 swells", "counter");
-			       addMetric(metrics, ret, "52.36.0", "L2 swells", "counter");
-			       addMetric(metrics, ret, "72.36.0", "L3 swells", "counter");
-			       addMetric(metrics, ret, "euros", "euros all-in", "counter", 1000);
-			       addMetric(metrics, ret, "price", "all-in price", "gauge", 100);			       
-
-			       return pair<string,string>("text/plain", ret.str());
-			     });
-      
   bool first = true;
 
   SQLiteWriter sqw("electricity.sqlite3");
@@ -200,16 +202,20 @@ int main()
 
       auto price = getPrice(now);
       if(price) {
-	double nowprice = 1.21*((*price)+0.14718);
+	//                       euros/kWh
+	double nowprice = 1.21*((*price)+0.0916) + 0.0242; // 1.21*(sel.price+9.16) + 2.242
 	(*metrics)["price"]=nowprice;
-	cout<<" price "<< nowprice;
+	(*metrics)["rawprice"] = *price;	
+	cout<<" price "<< nowprice <<" rawprice "<< (*price);
+
+	// 1986012 euros 1.11987 kWh 53043.8 prevKwh 53043.6 price 0.176176 rawprice 0.034
+	// 2026-08-22 17:00:00+02:00,0.34  - euros/mWh -> 0.0034 euros/kWh -> 0.34 cent/kWh
       }
       else
 	rprice.reset();
       cout<<endl;
       
       if(!lastEurosTime || now/900 != lastEurosTime/900) {
-
 	if(!lastEurosTime) {
 	  prevKwh=kwh;
 	}
@@ -218,7 +224,7 @@ int main()
 	  cout<<"kwhDiff: "<< kwhDiff <<endl;
 	  price = getPrice(now-120); // to make sure we catch the price of the whole interval
 	  if(price) {
-	    rprice = 1.21*((*price)+0.14718);
+	    rprice = 1.21*((*price)+0.0916) + 0.0242;
 	    double delta = (*rprice)*kwhDiff;
 	    euros += delta;
 	    time_t t = now-120;
@@ -230,7 +236,7 @@ int main()
       }
       (*metrics)["euros"]=euros;
 
-      vector<pair<const char*, SQLiteWriter::var_t>> values;
+      vector<pair<string, SQLiteWriter::var_t>> values;
       for(const auto& v : *metrics)
 	values.emplace_back(v.first.c_str(), v.second);
       values.emplace_back("timestamp", time(0));
@@ -240,13 +246,16 @@ int main()
     }
 
     if(first) {
-      std::thread ws([&h2s]() {
-		       auto actx = h2s.addContext();
-		       ComboAddress listenOn("0.0.0.0:10000");
-		       h2s.addListener(listenOn, actx);
-		       cout<<"Listening on "<< listenOn.toStringWithPort() <<endl;
-		       h2s.runLoop();
-		     });
+      std::thread ws([&svr]() {
+	svr.set_socket_options([](socket_t sock) {
+	  int yes = 1;
+	  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+		     reinterpret_cast<const void *>(&yes), sizeof(yes));
+	});
+	
+	cout<<"Going live on http://0.0.0.0:10000/\n";
+	svr.listen("0.0.0.0", 10000);
+      });
       ws.detach();
       first = false;
     }
