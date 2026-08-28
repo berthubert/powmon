@@ -155,7 +155,8 @@ int main()
     addMetric(metrics, ret, "52.36.0", "L2 swells", "counter");
     addMetric(metrics, ret, "72.36.0", "L3 swells", "counter");
     addMetric(metrics, ret, "euros", "euros all-in", "counter", 1000);
-    addMetric(metrics, ret, "price", "all-in price", "gauge", 100);			       
+    addMetric(metrics, ret, "price", "all-in price", "gauge", 100);
+    addMetric(metrics, ret, "timestamp", "timestamp of measurement", "counter", 1);			       
     
     res.set_content(ret.str(), "text/plain");
   });
@@ -241,7 +242,7 @@ int main()
 	values.emplace_back(v.first.c_str(), v.second);
       values.emplace_back("timestamp", time(0));
       sqw.addValue(values);
-      
+      (*metrics)["timestamp"]=1.0*time(0);
       g_metrics = metrics;
     }
 
