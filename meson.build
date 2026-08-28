@@ -8,9 +8,14 @@ sqlitewriter_dep = dependency('sqlitewriter', static: true)
 doctest_dep=dependency('doctest')
 argparse_dep = dependency('argparse', version: '>=3')
 cpphttplib = dependency('cpp-httplib', default_options: 'cpp-httplib_brotli=disabled')
+gpiod = dependency('libgpiodcxx')
 
 executable('powmon', 'p1parse.cc', 'money.cc',
 	dependencies: [sqlitedep, json_dep, fmt_dep, sqlitewriter_dep, cpphttplib, argparse_dep])
+
+
+executable('solcount', 'solcount.cc',
+	dependencies: [gpiod, fmt_dep, cpphttplib, argparse_dep])
 
 
 #executable('testrunner', 'testrunner.cc', 'support.cc',  'siphash.cc', 'search.cc', 'meta.cc',
