@@ -238,8 +238,13 @@ int main()
       (*metrics)["euros"]=euros;
 
       vector<pair<string, SQLiteWriter::var_t>> values;
-      for(const auto& v : *metrics)
-	values.emplace_back(v.first.c_str(), v.second);
+      for(const auto& v : *metrics) {
+	string name="f"+v.first;
+	for(auto& c : name)
+	  if(c=='.') c='_';
+
+	values.emplace_back(name, v.second);
+      }
       values.emplace_back("timestamp", time(0));
       sqw.addValue(values);
       (*metrics)["timestamp"]=1.0*time(0);
