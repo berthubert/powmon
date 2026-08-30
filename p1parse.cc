@@ -239,10 +239,14 @@ int main()
 
       vector<pair<string, SQLiteWriter::var_t>> values;
       for(const auto& v : *metrics) {
-	string name="f"+v.first;
-	for(auto& c : name)
-	  if(c=='.') c='_';
-
+	string name;
+	if(!v.first.empty() && isdigit(v.first[0])) {
+	  string name="f"+v.first;
+	  for(auto& c : name)
+	    if(c=='.') c='_';
+	}
+	else
+	  name=v.first;
 	values.emplace_back(name, v.second);
       }
       values.emplace_back("timestamp", time(0));
